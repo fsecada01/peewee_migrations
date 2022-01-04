@@ -837,7 +837,7 @@ def get_operations_for_db(database, **kwargs):
     elif isinstance(database, peewee.MySQLDatabase):
         return MySQLOperations(database, **kwargs)
     elif isinstance(database, peewee.SqliteDatabase):
-        return Operations(database)
+        return Operations(database, atomic=True)
     else:
         raise NotImplementedError("Sqlite is not supported")
 
