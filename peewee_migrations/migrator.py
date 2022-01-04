@@ -133,7 +133,10 @@ class Column:
         if issubclass(self.field_class, peewee.ForeignKeyField):
             name = "snapshot.ForeignKeyField"
         else:
-            module, name = self.field_class.__module__, self.field_class.__name__
+            module, name = (
+                self.field_class.__module__,
+                self.field_class.__name__,
+            )
             if module != "peewee" or name not in peewee.__all__:
                 name = module + "." + name
         result = "%s = %s(%s)" % (self.name, name, param_str)
@@ -173,7 +176,9 @@ class Column:
         else:
             for cls in type(field).__mro__:
                 if cls in self._deconstructors:
-                    self._deconstructors[cls](field, params=params, complete=complete)
+                    self._deconstructors[cls](
+                        field, params=params, complete=complete
+                    )
                     break
 
         # Handle default value.
@@ -256,9 +261,14 @@ def deconstruct_foreignkey(field, params, complete):
         params["column_name"] = field.column_name
     else:
         params.pop("column_name", None)
-    if complete or field.rel_field.name != field.rel_model._meta.primary_key.name:
+    if (
+        complete
+        or field.rel_field.name != field.rel_model._meta.primary_key.name
+    ):
         params["field"] = field.rel_field.name
-    if complete or (field.backref and field.backref != field.model._meta.name + "_set"):
+    if complete or (
+        field.backref and field.backref != field.model._meta.name + "_set"
+    ):
         params["backref"] = field.backref
     default_object_id_name = field.column_name
     if default_object_id_name == field.name:
@@ -339,7 +349,8 @@ class Snapshot:
                     break
             else:
                 raise TypeError(
-                    'Model "%s" is used, but not included to the watch list.' % model
+                    'Model "%s" is used, but not included to the watch list.'
+                    % model
                 )
             return peewee.DeferredForeignKey(model, **kwargs)
 
@@ -409,7 +420,9 @@ class NodeDeconstructor:
         return self.get_code(node.column)
 
     def code_Column(self, node):
-        return CallBlock("Column", args=(self.get_code(node.source), node.name))
+        return CallBlock(
+            "Column", args=(self.get_code(node.source), node.name)
+        )
 
 
 class Compiler:
@@ -459,7 +472,10 @@ class Compiler:
             field_code.append(column.to_code())
             self.modules.update(column.modules)
 
-        meta = ["class Meta:", INDENT + 'table_name = "%s"' % model._meta.table_name]
+        meta = [
+            "class Meta:",
+            INDENT + 'table_name = "%s"' % model._meta.table_name,
+        ]
 
         if model._meta.schema:
             meta.append(INDENT + 'schema = "%s"' % model._meta.schema)
@@ -476,13 +492,19 @@ class Compiler:
 
         if model._meta.constraints:
             meta.append(
-                INDENT + "constraints = %r" % (get_constraints(model._meta.constraints))
+                INDENT
+                + "constraints = %r"
+                % (get_constraints(model._meta.constraints))
             )
 
         if model._meta.primary_key is not None:
             if isinstance(model._meta.primary_key, peewee.CompositeKey):
-                names = ", ".join(repr(x) for x in model._meta.primary_key.field_names)
-                meta.append(INDENT + "primary_key = peewee.CompositeKey(%s)" % names)
+                names = ", ".join(
+                    repr(x) for x in model._meta.primary_key.field_names
+                )
+                meta.append(
+                    INDENT + "primary_key = peewee.CompositeKey(%s)" % names
+                )
             elif model._meta.primary_key is False:
                 meta.append(INDENT + "primary_key = False")
         return template.format(
@@ -493,7 +515,9 @@ class Compiler:
 
 
 class Storage:
-    def __init__(self, database, models, migrate_table="migratehistory", **kwargs):
+    def __init__(
+        self, database, models, migrate_table="migratehistory", **kwargs
+    ):
         self.database = database
         self.models = models
         self.migrate_table = migrate_table
@@ -524,7 +548,10 @@ class Storage:
     @property
     def done(self):
         return [
-            x.name for x in self.history_model.select().order_by(self.history_model.id)
+            x.name
+            for x in self.history_model.select().order_by(
+                self.history_model.id
+            )
         ]
 
     @property
@@ -536,7 +563,9 @@ class Storage:
         self.history_model.insert({self.history_model.name: name}).execute()
 
     def set_undone(self, name):
-        self.history_model.delete().where(self.history_model.name == name).execute()
+        self.history_model.delete().where(
+            self.history_model.name == name
+        ).execute()
 
     def get_last_step(self):
         return (["zero"] + self.todo)[-1]
@@ -618,7 +647,9 @@ class FileStorage(Storage):
             os.makedirs(self.migrate_dir)
         todo = list(
             sorted(
-                f[:-3] for f in os.listdir(self.migrate_dir) if self.filemask.match(f)
+                f[:-3]
+                for f in os.listdir(self.migrate_dir)
+                if self.filemask.match(f)
             )
         )
         return todo
@@ -658,10 +689,14 @@ class MemoryStorage(Storage):
 
 
 class Router:
-    def __init__(self, database, models, storage_class=FileStorage, **storage_kwargs):
+    def __init__(
+        self, database, models, storage_class=FileStorage, **storage_kwargs
+    ):
         self.database = database
         self.models = models
-        self.storage = storage_class(database=database, models=models, **storage_kwargs)
+        self.storage = storage_class(
+            database=database, models=models, **storage_kwargs
+        )
 
     @property
     def done(self):
@@ -801,6 +836,8 @@ def get_operations_for_db(database, **kwargs):
         return PostgresqlOperations(database, **kwargs)
     elif isinstance(database, peewee.MySQLDatabase):
         return MySQLOperations(database, **kwargs)
+    elif isinstance(database, peewee.SqliteDatabase):
+        return Operations(database)
     else:
         raise NotImplementedError("Sqlite is not supported")
 
@@ -852,7 +889,10 @@ class Migrator:
 
         if serialize:
             self.recorder = OperationSerializer(
-                self.op, self.old_orm, self.new_orm, self.serialized.add_operation
+                self.op,
+                self.old_orm,
+                self.new_orm,
+                self.serialized.add_operation,
             )
         else:
             self.recorder = OperationRecorder(self.op, self.add_operation)
@@ -879,7 +919,9 @@ class Migrator:
     #         return fn
     #     return appender
 
-    def add_operation(self, obj, *, args=None, kwargs=None, color=None, forced=False):
+    def add_operation(
+        self, obj, *, args=None, kwargs=None, color=None, forced=False
+    ):
         if isinstance(obj, list):
             for op in obj:
                 self.add_operation(op, color=color, forced=forced)
@@ -923,7 +965,10 @@ class Migrator:
         deferred_fields = []
         for name in [m for m in models2 if m not in models1]:
             for field in models2[name]._meta.sorted_fields:
-                if isinstance(field, peewee.ForeignKeyField) and field.deferred:
+                if (
+                    isinstance(field, peewee.ForeignKeyField)
+                    and field.deferred
+                ):
                     deferred_fields.append(field)
             self.recorder.create_table(models2[name])
 
@@ -932,7 +977,9 @@ class Migrator:
                 self.recorder.create_foreign_key(field)
 
         models_to_migrate = [
-            (models1[name], models2[name]) for name in models1 if name in models2
+            (models1[name], models2[name])
+            for name in models1
+            if name in models2
         ]
         if models_to_migrate:
             self._migrate_models(models_to_migrate)
@@ -972,7 +1019,11 @@ class Migrator:
         result = {}
         for field in model._meta.sorted_fields:
             if isinstance(field, peewee.ForeignKeyField):
-                ddl = self.op.ctx().sql(field.foreign_key_constraint()).query()[0]
+                ddl = (
+                    self.op.ctx()
+                    .sql(field.foreign_key_constraint())
+                    .query()[0]
+                )
                 result[(ddl, field.unique)] = field
         return result
 
@@ -1005,13 +1056,19 @@ class Migrator:
         return State(
             pk_columns1=self._get_primary_key_columns(model1),
             pk_columns2=self._get_primary_key_columns(model2),
-            drop_indexes=[indexes1[key] for key in set(indexes1) - set(indexes2)],
-            add_indexes=[indexes2[key] for key in set(indexes2) - set(indexes1)],
+            drop_indexes=[
+                indexes1[key] for key in set(indexes1) - set(indexes2)
+            ],
+            add_indexes=[
+                indexes2[key] for key in set(indexes2) - set(indexes1)
+            ],
             drop_constraints=[
-                constraints1[key] for key in set(constraints1) - set(constraints2)
+                constraints1[key]
+                for key in set(constraints1) - set(constraints2)
             ],
             add_constraints=[
-                constraints2[key] for key in set(constraints2) - set(constraints1)
+                constraints2[key]
+                for key in set(constraints2) - set(constraints1)
             ],
             drop_fields=[fields1[key] for key in set(fields1) - set(fields2)],
             add_fields=[fields2[key] for key in set(fields2) - set(fields1)],
@@ -1093,7 +1150,9 @@ class Migrator:
 
         def run_helper(helper_func, old_field, new_field, code):
             kwargs = {
-                "postgres": isinstance(self.database, peewee.PostgresqlDatabase),
+                "postgres": isinstance(
+                    self.database, peewee.PostgresqlDatabase
+                ),
                 "mysql": isinstance(self.database, peewee.MySQLDatabase),
                 "old_field": old_field,
                 "new_field": new_field,
@@ -1105,7 +1164,8 @@ class Migrator:
             result = [x.format(**kwargs) for x in helper_func(**kwargs)]
             if kwargs["old_model"]:
                 code.set_var_if_not_exists(
-                    kwargs["old_model"], "old_orm[%r]" % old_field.model._meta.name
+                    kwargs["old_model"],
+                    "old_orm[%r]" % old_field.model._meta.name,
                 )
             if kwargs["new_model"]:
                 code.set_var_if_not_exists(
@@ -1113,9 +1173,13 @@ class Migrator:
                 )
             code.add_operation(result)
 
-        if (field1 is None or field1.null) and (field2 is not None and not field2.null):
+        if (field1 is None or field1.null) and (
+            field2 is not None and not field2.null
+        ):
             run_helper(set_not_null_helper, None, field2, self.forward_hints)
-        if (field2 is None or field2.null) and (field1 is not None and not field1.null):
+        if (field2 is None or field2.null) and (
+            field1 is not None and not field1.null
+        ):
             run_helper(set_not_null_helper, None, field1, self.backward_hints)
 
         if type_changed:
@@ -1130,11 +1194,15 @@ class Migrator:
                 else field2
             )
             for (tp1, tp2), helper in DATA_MIGRATE_HINTS:
-                if isinstance(field_check1, tp1) and isinstance(field_check2, tp2):
+                if isinstance(field_check1, tp1) and isinstance(
+                    field_check2, tp2
+                ):
                     run_helper(helper, field1, field2, self.forward_hints)
                     break
             for (tp1, tp2), helper in DATA_MIGRATE_HINTS:
-                if isinstance(field_check2, tp1) and isinstance(field_check1, tp2):
+                if isinstance(field_check2, tp1) and isinstance(
+                    field_check1, tp2
+                ):
                     run_helper(helper, field2, field1, self.backward_hints)
                     break
 
@@ -1184,7 +1252,9 @@ class MigrateCode:
     def add_operation(self, result):
         comment, code, *alerts = result
         if alerts:
-            self.alerts.extend([(len(self.results), alert) for alert in alerts])
+            self.alerts.extend(
+                [(len(self.results), alert) for alert in alerts]
+            )
         if comment:
             self.results.append("# " + comment)
         if code:
@@ -1376,9 +1446,14 @@ class OperationSerializer:
 
         def recorder(*args, **kwargs):
             s_args = [self.__serialize(arg) for arg in args]
-            s_kwargs = ["%s=%s" % (k, self.__serialize(v)) for k, v in kwargs.items()]
+            s_kwargs = [
+                "%s=%s" % (k, self.__serialize(v)) for k, v in kwargs.items()
+            ]
             self.recorder(
-                ("", "op.%s(%s)" % (obj.__name__, ", ".join(s_args + s_kwargs)))
+                (
+                    "",
+                    "op.%s(%s)" % (obj.__name__, ", ".join(s_args + s_kwargs)),
+                )
             )
 
         return recorder
@@ -1458,11 +1533,15 @@ class Operations:
 
     @operation
     def drop_column(self, field):
-        return self.alter_table(field.model).literal(" DROP COLUMN ").sql(field)
+        return (
+            self.alter_table(field.model).literal(" DROP COLUMN ").sql(field)
+        )
 
     @operation
     def rename_column(self, field, column_name):
-        return self._rename_column(field.model, field, field.column_name, column_name)
+        return self._rename_column(
+            field.model, field, field.column_name, column_name
+        )
 
     @operation
     def add_primary_key_constraint(self, model):
@@ -1517,7 +1596,9 @@ class Operations:
 
     def _add_foreign_key_constraint(self, model, field):
         return (
-            self.alter_table(model).literal(" ADD ").sql(field.foreign_key_constraint())
+            self.alter_table(model)
+            .literal(" ADD ")
+            .sql(field.foreign_key_constraint())
         )
 
     def _drop_foreign_key_constraint(self, model, name):
@@ -1566,7 +1647,9 @@ class PostgresqlOperations(Operations):
         """Gets the bare cursor which has no transaction context."""
         connection = self._database.connection()
         old_isolation_level = connection.isolation_level
-        connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+        connection.set_isolation_level(
+            psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT
+        )
         try:
             yield
         finally:
@@ -1625,7 +1708,11 @@ class PostgresqlOperations(Operations):
             .literal("ALTER TABLE ")
             .sql(peewee.Entity(table_name))
             .literal(" DROP CONSTRAINT ")
-            .sql(lambda: self._get_primary_key_constraint_name(table_name, schema))
+            .sql(
+                lambda: self._get_primary_key_constraint_name(
+                    table_name, schema
+                )
+            )
         )
 
     def _add_foreign_key_constraint(self, model, field):
@@ -1639,7 +1726,9 @@ class PostgresqlOperations(Operations):
         column_name = field.column_name
         rel_column_name = field.rel_field.column_name
         return [
-            super()._add_foreign_key_constraint(model, field).literal(" NOT VALID"),
+            super()
+            ._add_foreign_key_constraint(model, field)
+            .literal(" NOT VALID"),
             lazy_query()
             .literal("ALTER TABLE ")
             .sql(peewee.Entity(table_name))
@@ -1725,7 +1814,11 @@ class PostgresqlOperations(Operations):
 class MySQLOperations(Operations):
     @operation
     def drop_index(self, model, index):
-        return model._schema._drop_index(index, safe=False).literal(" ON ").sql(model)
+        return (
+            model._schema._drop_index(index, safe=False)
+            .literal(" ON ")
+            .sql(model)
+        )
 
     def _rename_column(self, model, field, column_name_from, column_name_to):
         column_from = peewee.Column(model._meta.table, column_name_from)
@@ -1758,7 +1851,10 @@ class MySQLOperations(Operations):
             field.__class__ = peewee.IntegerField
             ctx = self.alter_table(model)
             operations.append(
-                ctx.literal(" CHANGE ").sql(pk).literal(" ").sql(field.ddl(ctx))
+                ctx.literal(" CHANGE ")
+                .sql(pk)
+                .literal(" ")
+                .sql(field.ddl(ctx))
             )
         operations.append(self.alter_table(model).literal(" DROP PRIMARY KEY"))
         return operations
